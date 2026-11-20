@@ -1,5 +1,4 @@
 [theme]
 primaryColor = "#4338ca"
 font = "sans serif"
-[client]
-toolbarMode = "viewer"
+

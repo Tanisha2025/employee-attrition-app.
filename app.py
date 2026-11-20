@@ -1,4 +1,5 @@
 """HR Attrition Risk Dashboard  (run:  streamlit run app.py)"""
+import html
 import re
 from pathlib import Path
 
@@ -11,18 +12,64 @@ import streamlit as st
 from common import INPUT_COLUMNS, CATEGORICAL, ENGINEERED, add_features
 from recommendations import get_recommendations, RATING
 
-st.set_page_config(page_title="Attrition risk check", page_icon="🧭", layout="wide")
+st.set_page_config(page_title="Attrition risk check", page_icon="📊", layout="wide")
 
 st.markdown("""
 <style>
-.block-container {padding-top: 2rem;}
-.verdict {padding: 1rem 1.25rem; border-radius: 8px; border-left: 6px solid var(--c);
-          background: color-mix(in srgb, var(--c) 10%, transparent);}
-.verdict h2 {margin: 0; font-size: 1.5rem;}
-.verdict p {margin: .25rem 0 0 0;}
-.rec {padding: .65rem .9rem; border-radius: 6px; margin-bottom: .5rem;
-      border-left: 4px solid var(--c); background: color-mix(in srgb, var(--c) 8%, transparent);}
-.rec b {display: block;}
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+.stApp, .stApp h1, .stApp h2, .stApp h3, .stApp button, .stApp label {font-family: 'Inter', system-ui, sans-serif;}
+#MainMenu, footer {visibility: hidden;}
+[data-testid="stHeader"] {background: transparent;}
+.block-container {padding-top: 1.4rem; max-width: 1180px;}
+
+/* ---------- hero ---------- */
+.hero {background: linear-gradient(120deg, #1e1b4b 0%, #3730a3 52%, #0e7490 100%);
+       color: #fff; border-radius: 20px; padding: 2.1rem 2.3rem; margin-bottom: 1.3rem;
+       position: relative; overflow: hidden;}
+.hero::after {content: ""; position: absolute; right: -70px; top: -80px; width: 300px; height: 300px;
+              border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.20), transparent 70%);}
+.hero .tag {font-size: .74rem; letter-spacing: .16em; font-weight: 700; opacity: .8; color: #fff;}
+.hero h1 {margin: .35rem 0 .5rem; padding: 0; font-size: 2.15rem; font-weight: 800; line-height: 1.15; color: #fff !important;}
+.hero p {margin: 0; max-width: 660px; font-size: 1.02rem; line-height: 1.55; color: rgba(255,255,255,.9);}
+.pills {margin-top: 1.2rem; display: flex; gap: .6rem; flex-wrap: wrap;}
+.pill {background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.28);
+       padding: .38rem .85rem; border-radius: 999px; font-size: .82rem; font-weight: 600; color: #fff;}
+
+/* ---------- cards ---------- */
+[class*="st-key-card_"] {border-radius: 16px; padding: 1.15rem 1.3rem 1.2rem;
+    border: 1px solid color-mix(in srgb, currentColor 13%, transparent);
+    background: color-mix(in srgb, currentColor 2.5%, transparent);
+    box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(30,27,75,.07);}
+.sec {display: flex; align-items: center; gap: .75rem; margin-bottom: .55rem;}
+.sec .n {width: 30px; height: 30px; flex: none; border-radius: 50%; background: #4338ca; color: #fff;
+         display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: .88rem;}
+.sec b {font-size: 1.05rem; font-weight: 700;}
+.sec small {display: block; opacity: .62; font-size: .82rem;}
+
+/* ---------- buttons, tabs, metrics ---------- */
+[data-testid^="stBaseButton-primary"] {background: linear-gradient(120deg, #4338ca, #0e7490); border: none;
+    border-radius: 12px; padding: .65rem 1.8rem; font-weight: 700; color: #fff; box-shadow: 0 6px 16px rgba(67,56,202,.30);}
+[data-testid^="stBaseButton-primary"]:hover {filter: brightness(1.1); color: #fff;}
+[data-testid^="stBaseButton-secondary"] {border-radius: 10px; font-weight: 600;}
+button[data-baseweb="tab"] {font-weight: 600; font-size: 1rem;}
+[data-testid="stMetric"] {border-radius: 14px; padding: .9rem 1.1rem;
+    border: 1px solid color-mix(in srgb, currentColor 13%, transparent);}
+[data-testid="stExpander"] {border-radius: 12px;}
+
+/* ---------- result ---------- */
+.banner {border-radius: 18px; padding: 1.3rem 1.6rem; color: #fff; margin-bottom: 1rem;
+         background: linear-gradient(120deg, var(--c), color-mix(in srgb, var(--c) 68%, #000));
+         box-shadow: 0 10px 26px color-mix(in srgb, var(--c) 35%, transparent);}
+.banner .bl {font-size: .74rem; letter-spacing: .16em; font-weight: 700; opacity: .85;}
+.banner h2 {margin: .15rem 0 .3rem; padding: 0; font-size: 2rem; font-weight: 800; color: #fff !important;}
+.banner p {margin: 0; font-size: .98rem; opacity: .93; color: #fff;}
+.rec {border-radius: 14px; padding: .95rem 1.1rem; margin-bottom: .8rem;
+      border: 1px solid color-mix(in srgb, currentColor 13%, transparent); border-left: 5px solid var(--c);}
+.rec .chip {display: inline-block; font-size: .68rem; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+            padding: .16rem .6rem; border-radius: 999px; background: var(--c); color: #fff;}
+.rec .t {font-weight: 700; margin: .5rem 0 .25rem; font-size: 1rem;}
+.rec .a {opacity: .85; font-size: .92rem; line-height: 1.5;}
+.foot {opacity: .55; font-size: .8rem; text-align: center; margin-top: 2rem;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -58,7 +105,7 @@ def gauge(p):
     fig = go.Figure(go.Indicator(
         mode="gauge+number", value=p * 100,
         number={"suffix": "%", "font": {"size": 44}},
-        gauge={"axis": {"range": [0, 100]}, "bar": {"color": "#333"},
+        gauge={"axis": {"range": [0, 100]}, "bar": {"color": "#4338ca"},
                "steps": [{"range": [0, 60 * THR], "color": "#bfe3cd"},
                          {"range": [60 * THR, 100 * THR], "color": "#f6dba5"},
                          {"range": [100 * THR, 100], "color": "#efb4ad"}]}))
@@ -114,9 +161,32 @@ def rating(label, key, default=3):
 
 
 # ------------------------------------------------------------------ layout
-st.title("Employee attrition risk check")
-st.caption("Enter an employee's details to see how likely they are to leave, "
-           "why, and what HR can do about it.")
+_m = B["metrics"]
+st.markdown(f"""
+<div class="hero">
+  <div class="tag">HR ANALYTICS</div>
+  <h1>Employee Attrition Risk</h1>
+  <p>Enter a few details about an employee to see how likely they are to leave,
+  what is driving the risk, and which actions HR can take to keep them.</p>
+  <div class="pills">
+    <span class="pill">{_m['recall']:.0%} of leavers caught</span>
+    <span class="pill">ROC AUC {_m['roc_auc']:.2f}</span>
+    <span class="pill">11 quick inputs · 7 optional</span>
+    <span class="pill">Explainable results</span>
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
+with st.sidebar:
+    st.markdown("### How it works")
+    st.markdown("1. Fill in the employee's details  \n"
+                "2. Press **Check attrition risk**  \n"
+                "3. Read the reasons and act on the suggestions")
+    st.divider()
+    st.markdown("### Model snapshot")
+    st.metric("Recall", f"{_m['recall']:.0%}", help="Share of real leavers the model catches.")
+    st.metric("Precision", f"{_m['precision']:.0%}", help="Share of flagged employees who really leave.")
+    st.caption("Decision support only. Gender, marital status and age are never used.")
 
 SHOW_BATCH = True   # "Check many (CSV)" tab  -> set False to hide
 SHOW_MODEL = True   # "About the model" tab  -> set False to hide
@@ -176,17 +246,24 @@ def radio_rating(label, key, help_text=None):
                     horizontal=True, key=key, help=help_text)
 
 
+def section(n, title, sub=""):
+    st.markdown(f"<div class='sec'><div class='n'>{n}</div>"
+                f"<div><b>{title}</b><small>{sub}</small></div></div>", unsafe_allow_html=True)
+
+
 with tab_single:
-    b1, b2, b3, _sp = st.columns([1.2, 1.2, 1, 3])
-    b1.button("Fill example: likely to leave", on_click=load_example, args=(EX_LEAVE,))
-    b2.button("Fill example: likely to stay", on_click=load_example, args=(EX_STAY,))
-    b3.button("Reset form", on_click=load_example, args=(BASE,))
+    q1, q2, q3, q4 = st.columns([1.1, 1.3, 1.3, 1])
+    q1.markdown("<div style='padding-top:.45rem;font-weight:600;opacity:.7'>Quick demo</div>",
+                unsafe_allow_html=True)
+    q2.button("Example: likely to leave", on_click=load_example, args=(EX_LEAVE,), width="stretch")
+    q3.button("Example: likely to stay", on_click=load_example, args=(EX_STAY,), width="stretch")
+    q4.button("Reset form", on_click=load_example, args=(BASE,), width="stretch")
 
     with st.form("employee", border=False):
         left, right = st.columns(2)
         with left:
-            with st.container(border=True):
-                st.markdown("**Role and pay**")
+            with st.container(key="card_role"):
+                section(1, "Role and pay", "Where the employee sits today")
                 st.selectbox("Department", OPT["Department"], key="f_department")
                 st.selectbox("Job role", OPT["JobRole"], key="f_job_role")
                 st.selectbox("Job level", [1, 2, 3, 4, 5], key="f_job_level",
@@ -197,15 +274,14 @@ with tab_single:
                 st.radio("Works overtime regularly?", ["No", "Yes"], horizontal=True,
                          key="f_overtime")
         with right:
-            with st.container(border=True):
-                st.markdown("**How they feel about work**")
-                st.caption("From your latest survey or a recent one-to-one.")
+            with st.container(key="card_feel"):
+                section(2, "How they feel about work", "From your latest survey or one-to-one")
                 radio_rating("Job satisfaction", "f_job_sat")
                 radio_rating("Satisfaction with work environment", "f_env_sat")
                 radio_rating("Work-life balance", "f_wlb")
 
-        with st.container(border=True):
-            st.markdown("**Time and career**")
+        with st.container(key="card_time"):
+            section(3, "Time and career", "Experience and growth")
             t1, t2, t3 = st.columns(3)
             t1.number_input("Total years of work experience", 0, 45, key="f_total_years")
             t2.number_input("Years at this company", 0, 45, key="f_years_co")
@@ -248,22 +324,30 @@ with tab_single:
         p = float(predict_proba(df_row)[0])
         band, color = risk_band(p)
         leaves = p >= THR
+        exp = explain(df_row)
+        pos = exp[exp["impact"] > 0]
+        top_driver = pos.iloc[-1]["feature"] if len(pos) else "none"
+        st.toast("Result is ready below")
 
-        st.divider()
-        left, right = st.columns([1, 1.3])
-        with left:
-            st.plotly_chart(gauge(p), width="stretch")
-            headline = "Likely to leave" if leaves else "Likely to stay"
-            st.markdown(
-                f"<div class='verdict' style='--c:{color}'><h2>{headline}</h2>"
-                f"<p>{band} risk · model score {p:.0%} "
-                f"(flag raised from {THR:.0%})</p></div>", unsafe_allow_html=True)
-        with right:
-            st.subheader("What is driving this result")
-            exp = explain(df_row)
-            st.plotly_chart(contrib_chart(exp), width="stretch")
+        st.markdown("<div style='height:.6rem'></div>", unsafe_allow_html=True)
+        headline = "Likely to leave" if leaves else "Likely to stay"
+        st.markdown(
+            f"<div class='banner' style='--c:{color}'><div class='bl'>{band.upper()} RISK</div>"
+            f"<h2>{headline}</h2><p>Model score {p:.0%} &nbsp;·&nbsp; alert level {THR:.0%} "
+            f"&nbsp;·&nbsp; biggest driver: {html.escape(top_driver)}</p></div>",
+            unsafe_allow_html=True)
 
-        st.subheader("Recommended HR actions")
+        g_col, d_col = st.columns([1, 1.35])
+        with g_col:
+            with st.container(key="card_gauge"):
+                section("%", "Risk score", "Green is safe, red is above the alert level")
+                st.plotly_chart(gauge(p), width="stretch")
+        with d_col:
+            with st.container(key="card_drivers"):
+                section("?", "What is driving this result", "Red raises the risk, green lowers it")
+                st.plotly_chart(contrib_chart(exp), width="stretch")
+
+        st.markdown("### Recommended HR actions")
         if not leaves:
             st.caption("Risk is below the alert level. These are preventive actions.")
         recs = get_recommendations(row, B["peer_income"])
@@ -271,16 +355,21 @@ with tab_single:
         def show(r):
             c = PRIORITY_COLOR[r["priority"]]
             st.markdown(
-                f"<div class='rec' style='--c:{c}'><b>{r['area']}: {r['issue']} "
-                f"({PRIORITY_LABEL[r['priority']]})</b>{r['action']}</div>",
+                f"<div class='rec' style='--c:{c}'><span class='chip'>{PRIORITY_LABEL[r['priority']]}</span>"
+                f"<div class='t'>{html.escape(r['area'])}: {html.escape(r['issue'])}</div>"
+                f"<div class='a'>{html.escape(r['action'])}</div></div>",
                 unsafe_allow_html=True)
 
-        for r in recs[:4]:
-            show(r)
+        def grid(items):
+            cols = st.columns(2)
+            for i, r in enumerate(items):
+                with cols[i % 2]:
+                    show(r)
+
+        grid(recs[:4])
         if len(recs) > 4:
             with st.expander(f"{len(recs) - 4} more suggestions"):
-                for r in recs[4:]:
-                    show(r)
+                grid(recs[4:])
         st.caption("This is decision support, not a verdict on the person. "
                    "Use it to start a conversation, not to make hiring, firing or pay decisions.")
 
@@ -339,3 +428,6 @@ if SHOW_MODEL:
         st.info("Gender, marital status and age are intentionally excluded so the model "
                 "cannot treat people differently because of them. The sample IBM dataset is "
                 "fictional: retrain on your own HR data before real use.")
+
+st.markdown("<div class='foot'>Built with scikit-learn and Streamlit · Decision support only</div>",
+            unsafe_allow_html=True)
